@@ -1,9 +1,17 @@
 var fs = require('fs'),
 	http = require('http'),
+	path = require('path'),
 	urllib = require('url'),
 	sqlite3 = require('sqlite3'),
 	mimetype = require('mimetype'),
-	db = new sqlite3.Database(__dirname + '/docs.db');
+	dbfile = path.resolve(__dirname, process.argv[2]), db;
+
+if(!fs.existsSync(dbfile)) {
+	console.log('Database do not exists!');
+	process.exit();
+}
+
+db = new sqlite3.Database(dbfile);
 
 function initServer() {
 	var httpServer = http.createServer(function(req, resp){

@@ -1,0 +1,7 @@
+{
+	"name": "chrome_extension_docs",
+	"baseUrl": "https://developer.chrome.com",
+	"acceptUrls": ["/extensions", "/apps"],
+	"startUrl": "/apps/api_index",
+	"limit": 15
+}

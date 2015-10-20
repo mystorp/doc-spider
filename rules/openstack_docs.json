@@ -1,0 +1,8 @@
+{
+	"name": "openstack_docs",
+	"baseUrl": "http://docs.openstack.org",
+	"acceptUrls": [],
+	"excludeUrls": ["/ja/", "/de/", "/fr/", "/pt_BR/", "/zh_CN/", "/ko_KR/"],
+	"startUrl": "/",
+	"limit": 15
+}

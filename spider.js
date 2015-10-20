@@ -4,21 +4,58 @@ var request = require('request'),
 	urllib = require('url'),
 	path = require('path'),
 	util = require('util'),
-	fs = require('fs');
+	fs = require('fs'),
+	colors;
+
+colors = require('colors');
 
 function Spider(options) {
 	if(!(this instanceof Spider)) {
 		throw new Error('Class can\'t be function call');
 	}
-	this.limit = options.limit || 10;
-	this.acceptUrls = options.acceptUrls || [];
+	this.mergeOptions(options);
 	this._visited = [];
 	this.initDB();
 }
 
+Spider.prototype.mergeOptions = function(options) {
+	var me = this, defaults = {
+		name: 'docs',
+		limit: 20,
+		acceptUrls: [],
+		excludeUrls: [],
+		startUrl: '',
+		baseUrl: ''
+	};
+	Object.keys(defaults).forEach(function(f){
+		me[f] = options[f] || defaults[f];
+	});
+	if(!me.baseUrl) {
+		throw new Error("baseUrl should be set");
+	}
+	me.acceptUrls = me.acceptUrls.map(function(p){
+		if(p.startsWith('/')) {
+			return urllib.resolve(me.baseUrl, p);
+		} else {
+			return p;
+		}
+	});
+	me.excludeUrls = me.excludeUrls.map(function(p){
+		if(p.startsWith('/')) {
+			return urllib.resolve(me.baseUrl, p);
+		} else {
+			return p;
+		}
+	});
+	if(me.startUrl.startsWith('/')) {
+		me.startUrl = urllib.resolve(me.baseUrl, me.startUrl);
+	}
+};
+
 Spider.prototype.start = function(url){
 	var me = this, queue;
-	if(me.queue) { return; }
+	url = url || me.startUrl;
+	if(!url || me.queue) { return; }
 	queue = async.queue(function(url, cb){
 		me.get(url, function(){
 			me._visited.push(url);
@@ -39,10 +76,13 @@ Spider.prototype.get = function(url, callback){
 	request(url, function(e, resp, body){
 		var ctype;
 		if(e) {
-			console.log('error on: %s, %s', url, e.message);
+			console.error('error on: %s, %s'.red, url, e.message);
 			return callback(null);
 		}
 		ctype = resp.headers['content-type'];
+		if(!ctype) {
+			ctype = mimetype.lookup(url) || mimetype.lookup('.exe');
+		}
 		if(ctype.startsWith("text/css")) {
 			me.parseCss(url, body);
 		} else if(ctype.startsWith("text/html")) {
@@ -64,7 +104,7 @@ Spider.prototype.parseCss = function(url, body){
 		}
 	}
 	//read url(xx.png)
-	re = /url\(([^)]+)\)/gi;
+	re = /url\(['"]?([^)]+?)['"]?\)/gi;
 	result = body.match(re);
 	if(result) {
 		for(i=0,len=result.length;i<len;i++) {
@@ -72,7 +112,7 @@ Spider.prototype.parseCss = function(url, body){
 			tmp && links.push(urllib.resolve(url, tmp[1]));
 		}
 	}
-	links.length && me.mergeLinks(url, links);
+	links.length && this.mergeLinks(url, links);
 };
 
 Spider.prototype.parseHtml = function(url, body) {
@@ -83,6 +123,9 @@ Spider.prototype.parseHtml = function(url, body) {
 	//<img/>
 	links = slice.call(doc.querySelectorAll('img'), 0);
 	me.mergeLinks(url, links.map(function(img){ return img.src||'' }));
+	//<script/>
+	links = slice.call(doc.querySelectorAll('script'), 0);
+	me.mergeLinks(url, links.map(function(script){ return script.src||'' }));
 	//read <link/>
 	links = slice.call(doc.querySelectorAll('link'), 0);
 	me.mergeLinks(url, links.map(function(lnk){ return lnk.href||'' }));
@@ -96,7 +139,7 @@ Spider.prototype.save = function(url){
 	args[0] = parts.pathname;
 	this.db.run('insert into docs(url, type, content) values(?,?,?)', args, function(e){
 		if(e) {
-			console.log(e);
+			console.log(e.message.red);
 		}
 	});
 };
@@ -129,37 +172,53 @@ Spider.prototype.mergeLinks = function(base, links){
 };
 
 Spider.prototype.accept = function(url){
-	var urls = this.acceptUrls, i, len, x;
+	var urls = this.excludeUrls, i, len, x;
 	if(typeof url !== "string") { return false; }
+	if(!url.startsWith(this.baseUrl)) { return false; }
+	for(i=0,len=urls.length;i<len;i++) {
+		if(url.startsWith(urls[i])) {
+			return false;
+		}
+	}
+	urls = this.acceptUrls;
 	if(urls.length === 0) { return true; }
 	for(i=0,len=urls.length;i<len;i++) {
-		x = urls[i];
-		if(typeof x === "string") {
-			if(url.startsWith(x)) {
-				return true;
-			}
-		} else if(util.isRegExp(x)) {
-			if(x.test(url)) {
-				return true;
-			}
+		if(url.startsWith(urls[i])) {
+			return true;
 		}
-		
 	}
 	return false;
 };
 
 Spider.prototype.initDB = function(){
-	var sqlite3 = require('sqlite3'), db, file = path.join(__dirname, 'docs.db'), createTable;
-	if(!fs.existsSync(file)) {
-		createTable = function(){
-			var sql = fs.readFileSync(path.join(__dirname, 'docs.sql'), {encoding: 'ascii'});
-			db.exec(sql);
-		};
-	}
+	var me = this, sqlite3 = require('sqlite3'), db, file = path.join(__dirname, me.name + '.db'), createTable;
 	db = new sqlite3.Database(file);
-	createTable && createTable();
+	createTable = function(){
+		var sql = fs.readFileSync(path.join(__dirname, 'docs.sql'), {encoding: 'ascii'});
+		db.exec(sql);
+	};
+	db.get('select tbl_name from sqlite_master where type=? and tbl_name=?', ['table', 'docs'], function(e, row){
+		if(e) {
+			throw e;
+		} else {
+			if(!row) {
+				createTable();
+			} else {
+				console.log('[ok] table `docs` exists!');
+				db.all('select url from docs', function(e, rows){
+					var tmp;
+					if(rows && rows.length) {
+						rows = rows.map(function(o){ return urllib.resolve(me.baseUrl, o.url); });
+						tmp = me._visited;
+						me._visited = rows;
+						tmp.length && me._visited.push.apply(me._visited, tmp);
+					}
+				});
+			}
+		}
+	});
 	db.run('PRAGMA synchronous=OFF');
-	this.db = db;
+	me.db = db;
 };
 
 Spider.prototype.destroy = function(){
@@ -172,8 +231,17 @@ Spider.prototype.destroy = function(){
 module.exports = Spider;
 
 function main() {
-	var spider = new Spider({acceptUrls: ['https://developer.chrome.com/extensions', 'https://developer.chrome.com/apps']});
-	spider.start('https://developer.chrome.com/apps/api_index');
+	var argv = process.argv, rule = argv[2], config, spider;
+	if(!rule) {
+		cosnole.log("Usage: node %s rule_file", __filename);
+		process.exit();
+	}
+	config = require(path.resolve(__dirname, rule.replace(/\\/g, '/')));
+	spider = new Spider(config);
+	spider.start();
+	process.on('exit', function(){
+		spider.destroy();
+	});
 }
 
 if(module === require.main) {
