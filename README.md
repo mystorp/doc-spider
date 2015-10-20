@@ -23,14 +23,14 @@
 * `startUrl` 这是个可选字段。指定开始从哪个 URL 开始爬取资源
 * `limit` 这是个可选择字段。指定默认同时请求的数量
 `rule.json` 准备好之后，就可以开始爬取了：
-```js
+```
 node spider.js rule.json
 ```
 
 #如何查看开发文档
 文档下载完毕，就可以访问了，运行下面的命令：
-```js
-node index.js &lt;name&gt;.db
+```
+node index.js <name>.db
 ```
 这里的 &lt;name&gt;.db 是下载开发文档时自动生成的数据库名
 跑起来之后，就打开浏览器访问：`http://127.0.0.1:3000`就可以了
