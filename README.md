@@ -6,6 +6,7 @@
 
 #如何下载开发文档
 要下载某个开发文档，需要首先编写一个 `rule.json` 文件，这个文件定义了一系列在爬取条件，如：
+
 ```json
 {
 	"name": "openstack_docs",
@@ -15,6 +16,7 @@
 	"startUrl": "/",
 	"limit": 15
 }
+
 ```
 * `name` 这是个必须字段。将要生成的数据库的文件名，形如这样：&lt;name&gt;.db
 * `baseUrl` 这是个必须字段。baseUrl 定义需要爬取的资源的公共前缀
@@ -22,16 +24,20 @@
 * `excludeUrls` 这是个可选字段。指定不需要爬取的资源的 path 前缀
 * `startUrl` 这是个可选字段。指定开始从哪个 URL 开始爬取资源
 * `limit` 这是个可选择字段。指定默认同时请求的数量
+
 `rule.json` 准备好之后，就可以开始爬取了：
-```
+
+```javascript
 node spider.js rule.json
 ```
 
 #如何查看开发文档
 文档下载完毕，就可以访问了，运行下面的命令：
-```
+
+```javascript
 node index.js <name>.db
 ```
+
 这里的 &lt;name&gt;.db 是下载开发文档时自动生成的数据库名
 跑起来之后，就打开浏览器访问：`http://127.0.0.1:3000`就可以了
 
