@@ -27,14 +27,14 @@
 
 `rule.json` 准备好之后，就可以开始爬取了：
 
-```javascript
+```bash
 node spider.js rule.json
 ```
 
 #如何查看开发文档
 文档下载完毕，就可以访问了，运行下面的命令：
 
-```javascript
+```bash
 node index.js <name>.db
 ```
 
