@@ -1,7 +1,7 @@
 {
-  "name": "chrome_extension_docs",
+  "name": "doc-spider",
   "version": "1.0.0",
-  "description": "download chrome extension documentations",
+  "description": "下载开发文档。理论上可以用此工具下载任何静态网站",
   "main": "index.js",
   "author": "mystorp@gmail.com",
   "license": "GPL",
