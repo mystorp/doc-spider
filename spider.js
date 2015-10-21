@@ -74,17 +74,17 @@ Spider.prototype.start = function(url){
 };
 
 Spider.prototype.get = function(url, callback){
-	var me = this, req, type;
+	var me = this, req, type, opt;
 	if(me._visited.indexOf(url) > -1) { return callback(); }
 	console.log('retrive link: ' + url);
 	//detect mimetype, if it is binary, set response.encoding
 	type = mimetype.lookup(url);
 	if(type) {
 		if(!textTypeRe.test(type)) {
-			url = {url: url, encoding: null};
+			opt = {url: url, encoding: null};
 		}
 	}
-	request(url, function(e, resp, body){
+	request(opt || url, function(e, resp, body){
 		var ctype;
 		if(e) {
 			console.error('error on: %s, %s'.red, url, e.message);
