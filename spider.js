@@ -1,11 +1,14 @@
-var DOMParser = require('xmldom').DOMParser,
+var mimetype = require('mimetype'),
+	cheerio = require('cheerio'),
 	request = require('request'),
 	async = require('async'),
 	urllib = require('url'),
 	path = require('path'),
 	util = require('util'),
 	fs = require('fs'),
-	colors;
+	colors,
+	jsHref = /^\s*javascript:/i,
+	textTypeRe = /^text/i;
 
 colors = require('colors');
 
@@ -14,13 +17,6 @@ function Spider(options) {
 		throw new Error('Class can\'t be function call');
 	}
 	this.mergeOptions(options);
-	this.parser = new DOMParser({
-		locator:{},
-		errorHandler:{
-			warning: function(){},
-			error: function(){},
-			fatalError: function(){}
-		}});
 	this._visited = [];
 	this.initDB();
 }
@@ -78,9 +74,16 @@ Spider.prototype.start = function(url){
 };
 
 Spider.prototype.get = function(url, callback){
-	var me = this, req;
+	var me = this, req, type;
 	if(me._visited.indexOf(url) > -1) { return callback(); }
 	console.log('retrive link: ' + url);
+	//detect mimetype, if it is binary, set response.encoding
+	type = mimetype.lookup(url);
+	if(type) {
+		if(!textTypeRe.test(type)) {
+			url = {url: url, encoding: null};
+		}
+	}
 	request(url, function(e, resp, body){
 		var ctype;
 		if(e) {
@@ -125,33 +128,30 @@ Spider.prototype.parseCss = function(url, body){
 };
 
 Spider.prototype.parseHtml = function(url, body) {
-	var me = this, doc, links, styles, slice = [].slice, protocol;
-	doc = me.parser.parseFromString(body, 'text/html');
-	protocol = url.substring(0, url.indexOf(':') + 1);
-	//<a/>
-	links = slice.call(doc.getElementsByTagName('a'), 0);
-	me.mergeLinks(links.map(function(a){
-		return urllib.resolve(url, a.getAttribute('href') || '');
+	var me = this, $;
+	$ = cheerio.load(body);
+	
+	me.mergeLinks($('a[href],link').map(function(i, el){
+		var x = $(el).attr('href');
+		if(x) {
+			if(!jsHref.test(x)) {
+				return urllib.resolve(url, x);
+			}
+		}
+		return url;
 	}));
-	//<img/>
-	links = slice.call(doc.getElementsByTagName('img'), 0);
-	me.mergeLinks(links.map(function(img){
-		return urllib.resolve(url, img.getAttribute('src') || '');
+	me.mergeLinks($('img, script[src]').map(function(i, el){
+		var x = $(el).attr('src');
+		if(x) {
+			return urllib.resolve(url, x);
+		}
+		return url;
 	}));
-	//<script/>
-	links = slice.call(doc.getElementsByTagName('script'), 0);
-	me.mergeLinks(links.map(function(script){
-		return urllib.resolve(url, script.getAttribute('src') || '');
-	}));
-	//read <link/>
-	links = slice.call(doc.getElementsByTagName('link'), 0);
-	me.mergeLinks(links.map(function(lnk){
-		return urllib.resolve(url, lnk.getAttribute('href') || '');
-	}));
-	//<style/>
-	styles = slice.call(doc.getElementsByTagName('style'), 0);
-	styles.forEach(function(s){ me.parseCss(url, s.innerHTML) });
-	doc = null;
+	
+	$('style').each(function(i, el){
+		var text = $(el).text();
+		text && me.parseCss(url, text);
+	});
 };
 
 Spider.prototype.save = function(url){
