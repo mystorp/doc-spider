@@ -64,6 +64,7 @@ Spider.prototype.start = function(url){
 	}, me.limit);
 	queue.push(url);
 	queue.drain = function(){
+		console.log("ok, all task was completed".green);
 		me.destroy();
 	};
 	me.queue = queue;
@@ -139,8 +140,10 @@ Spider.prototype.save = function(url){
 	var args = [].slice.call(arguments, 0), parts = urllib.parse(url);
 	args[0] = parts.pathname;
 	this.db.run('insert into docs(url, type, content) values(?,?,?)', args, function(e){
-		if(e) {
-			console.log(e.message.red);
+		if(e.message.indexOf('UNIQUE constraint failed') > -1) {
+			console.log("oh, already saved this:".red, url);
+		} else {
+			console.log(e);
 		}
 	});
 };
@@ -214,6 +217,7 @@ Spider.prototype.initDB = function(){
 						me._visited = rows;
 						tmp.length && me._visited.push.apply(me._visited, tmp);
 					}
+					console.log("load urls from db over, total visited:", me._visited.length);
 				});
 			}
 		}
@@ -240,9 +244,6 @@ function main() {
 	config = require(path.resolve(__dirname, rule.replace(/\\/g, '/')));
 	spider = new Spider(config);
 	spider.start();
-	process.on('exit', function(){
-		spider.destroy();
-	});
 }
 
 if(module === require.main) {
