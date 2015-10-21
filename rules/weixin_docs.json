@@ -1,0 +1,7 @@
+{
+	"name": "weixin_docs",
+	"baseUrl": "http://mp.weixin.qq.com",
+	"acceptUrls": ["/wiki"],
+	"startUrl": "/wiki/home/index.html",
+	"limit": 15
+}

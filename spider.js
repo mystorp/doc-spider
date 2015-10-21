@@ -1,6 +1,6 @@
-var request = require('request'),
+var DOMParser = require('xmldom').DOMParser,
+	request = require('request'),
 	async = require('async'),
-	jsdom = require('jsdom'),
 	urllib = require('url'),
 	path = require('path'),
 	util = require('util'),
@@ -14,6 +14,13 @@ function Spider(options) {
 		throw new Error('Class can\'t be function call');
 	}
 	this.mergeOptions(options);
+	this.parser = new DOMParser({
+		locator:{},
+		errorHandler:{
+			warning: function(){},
+			error: function(){},
+			fatalError: function(){}
+		}});
 	this._visited = [];
 	this.initDB();
 }
@@ -118,49 +125,58 @@ Spider.prototype.parseCss = function(url, body){
 };
 
 Spider.prototype.parseHtml = function(url, body) {
-	var me = this, doc = jsdom.jsdom(body), links, styles, slice = [].slice;
+	var me = this, doc, links, styles, slice = [].slice, protocol;
+	doc = me.parser.parseFromString(body, 'text/html');
+	protocol = url.substring(0, url.indexOf(':') + 1);
 	//<a/>
-	links = slice.call(doc.querySelectorAll('a'), 0);
-	me.mergeLinks(url, links.map(function(a){ return a.href||'' }));
+	links = slice.call(doc.getElementsByTagName('a'), 0);
+	me.mergeLinks(links.map(function(a){
+		return urllib.resolve(url, a.getAttribute('href') || '');
+	}));
 	//<img/>
-	links = slice.call(doc.querySelectorAll('img'), 0);
-	me.mergeLinks(url, links.map(function(img){ return img.src||'' }));
+	links = slice.call(doc.getElementsByTagName('img'), 0);
+	me.mergeLinks(links.map(function(img){
+		return urllib.resolve(url, img.getAttribute('src') || '');
+	}));
 	//<script/>
-	links = slice.call(doc.querySelectorAll('script'), 0);
-	me.mergeLinks(url, links.map(function(script){ return script.src||'' }));
+	links = slice.call(doc.getElementsByTagName('script'), 0);
+	me.mergeLinks(links.map(function(script){
+		return urllib.resolve(url, script.getAttribute('src') || '');
+	}));
 	//read <link/>
-	links = slice.call(doc.querySelectorAll('link'), 0);
-	me.mergeLinks(url, links.map(function(lnk){ return lnk.href||'' }));
+	links = slice.call(doc.getElementsByTagName('link'), 0);
+	me.mergeLinks(links.map(function(lnk){
+		return urllib.resolve(url, lnk.getAttribute('href') || '');
+	}));
 	//<style/>
-	styles = slice.call(doc.querySelectorAll('style'), 0);
+	styles = slice.call(doc.getElementsByTagName('style'), 0);
 	styles.forEach(function(s){ me.parseCss(url, s.innerHTML) });
+	doc = null;
 };
 
 Spider.prototype.save = function(url){
 	var args = [].slice.call(arguments, 0), parts = urllib.parse(url);
 	args[0] = parts.pathname;
 	this.db.run('insert into docs(url, type, content) values(?,?,?)', args, function(e){
-		if(e && e.message.indexOf('UNIQUE constraint failed') > -1) {
-			console.log("oh, already saved this:".red, url);
-		} else {
-			console.log(e);
+		if(e) {
+			if(e.message.indexOf('UNIQUE constraint failed') > -1) {
+				console.log("oh, already saved this:".red, url);
+			}
 		}
 	});
 };
 
-Spider.prototype.mergeLinks = function(base, links){
+Spider.prototype.mergeLinks = function(links){
 	var me = this, pool = {}, url, i, len, parts;
 	for(i=0,len=links.length;i<len;i++) {
 		url = links[i];
+		if(url in pool) {
+			continue;
+		}
 		parts = urllib.parse(url);
 		if(parts.hash) { continue; }
-		if(!url.indexOf('http') === 0) {
-			url = urllib.resolve(base, url);
-		}
 		if(me.accept(url)) {
-			if(!(url in pool)) {
-				pool[url] = '';
-			}
+			pool[url] = '';
 		}
 	}
 	for(i=0,len=me._visited;i<len;i++) {
