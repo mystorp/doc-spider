@@ -34,20 +34,20 @@ Spider.prototype.mergeOptions = function(options) {
 		throw new Error("baseUrl should be set");
 	}
 	me.acceptUrls = me.acceptUrls.map(function(p){
-		if(p.startsWith('/')) {
+		if(p.indexOf('/') === 0) {
 			return urllib.resolve(me.baseUrl, p);
 		} else {
 			return p;
 		}
 	});
 	me.excludeUrls = me.excludeUrls.map(function(p){
-		if(p.startsWith('/')) {
+		if(p.indexOf('/') === 0) {
 			return urllib.resolve(me.baseUrl, p);
 		} else {
 			return p;
 		}
 	});
-	if(me.startUrl.startsWith('/')) {
+	if(me.startUrl.indexOf('/') === 0) {
 		me.startUrl = urllib.resolve(me.baseUrl, me.startUrl);
 	}
 };
@@ -83,9 +83,9 @@ Spider.prototype.get = function(url, callback){
 		if(!ctype) {
 			ctype = mimetype.lookup(url) || mimetype.lookup('.exe');
 		}
-		if(ctype.startsWith("text/css")) {
+		if(ctype.indexOf("text/css") === 0) {
 			me.parseCss(url, body);
-		} else if(ctype.startsWith("text/html")) {
+		} else if(ctype.indexOf("text/html") === 0) {
 			me.parseHtml(url, body);
 		}
 		me.save(url, ctype, body);
@@ -150,7 +150,7 @@ Spider.prototype.mergeLinks = function(base, links){
 		url = links[i];
 		parts = urllib.parse(url);
 		if(parts.hash) { continue; }
-		if(!url.startsWith('http')) {
+		if(!url.indexOf('http') === 0) {
 			url = urllib.resolve(base, url);
 		}
 		if(me.accept(url)) {
@@ -174,16 +174,16 @@ Spider.prototype.mergeLinks = function(base, links){
 Spider.prototype.accept = function(url){
 	var urls = this.excludeUrls, i, len, x;
 	if(typeof url !== "string") { return false; }
-	if(!url.startsWith(this.baseUrl)) { return false; }
+	if(!url.indexOf(this.baseUrl) === 0) { return false; }
 	for(i=0,len=urls.length;i<len;i++) {
-		if(url.startsWith(urls[i])) {
+		if(url.indexOf(urls[i]) === 0) {
 			return false;
 		}
 	}
 	urls = this.acceptUrls;
 	if(urls.length === 0) { return true; }
 	for(i=0,len=urls.length;i<len;i++) {
-		if(url.startsWith(urls[i])) {
+		if(url.indexOf(urls[i]) === 0) {
 			return true;
 		}
 	}

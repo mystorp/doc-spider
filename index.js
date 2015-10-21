@@ -27,7 +27,7 @@ function initServer() {
 				resp.end(o.content);
 			} else {
 				file = __dirname + url;
-				if(url.startsWith('/static') && fs.existsSync(file)) {
+				if(url.indexOf('/static') === 0 && fs.existsSync(file)) {
 					resp.setHeader('content-type', mimetype.lookup(file));
 					fs.createReadStream(file).pipe(resp);
 				} else {
