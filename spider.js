@@ -77,6 +77,7 @@ Spider.prototype.get = function(url, callback){
 		var ctype;
 		if(e) {
 			console.error('error on: %s, %s'.red, url, e.message);
+			me.save(url, 'text/plain', null);
 			return callback(null);
 		}
 		ctype = resp.headers['content-type'];
@@ -174,7 +175,7 @@ Spider.prototype.mergeLinks = function(base, links){
 Spider.prototype.accept = function(url){
 	var urls = this.excludeUrls, i, len, x;
 	if(typeof url !== "string") { return false; }
-	if(!url.indexOf(this.baseUrl) === 0) { return false; }
+	if(url.indexOf(this.baseUrl) !== 0) { return false; }
 	for(i=0,len=urls.length;i<len;i++) {
 		if(url.indexOf(urls[i]) === 0) {
 			return false;
