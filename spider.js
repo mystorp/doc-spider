@@ -140,7 +140,7 @@ Spider.prototype.save = function(url){
 	var args = [].slice.call(arguments, 0), parts = urllib.parse(url);
 	args[0] = parts.pathname;
 	this.db.run('insert into docs(url, type, content) values(?,?,?)', args, function(e){
-		if(e.message.indexOf('UNIQUE constraint failed') > -1) {
+		if(e && e.message.indexOf('UNIQUE constraint failed') > -1) {
 			console.log("oh, already saved this:".red, url);
 		} else {
 			console.log(e);
