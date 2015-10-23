@@ -124,7 +124,7 @@ Spider.prototype.parseCss = function(url, body){
 			tmp && links.push(urllib.resolve(url, tmp[1]));
 		}
 	}
-	links.length && this.mergeLinks(url, links);
+	links.length && this.mergeLinks(links);
 };
 
 Spider.prototype.parseHtml = function(url, body) {
