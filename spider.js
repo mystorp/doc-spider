@@ -62,7 +62,7 @@ Spider.prototype.start = function(url){
 	queue = async.queue(function(url, cb){
 		me.get(url, function(){
 			me._visited.push(url);
-			process.nextTick(cb);
+			setImmediate(cb);
 		});
 	}, me.limit);
 	queue.push(url);
