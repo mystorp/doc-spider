@@ -8,7 +8,8 @@ var mimetype = require('mimetype'),
 	fs = require('fs'),
 	colors,
 	jsHref = /^\s*javascript:/i,
-	textTypeRe = /^text/i;
+	textTypeRe = /^text/i,
+	absUrlRe = /^\s*https?:\/\//i;
 
 colors = require('colors');
 
@@ -17,7 +18,10 @@ function Spider(options) {
 		throw new Error('Class can\'t be function call');
 	}
 	this.mergeOptions(options);
-	this._visited = [];
+	this._pool = {/*
+		url1: 0,// waiting
+		url2: 1 // visited
+	*/};
 	this.initDB();
 }
 
@@ -29,30 +33,28 @@ Spider.prototype.mergeOptions = function(options) {
 		excludeUrls: [],
 		startUrl: '',
 		baseUrl: ''
-	};
+	}, parts, pathname;
 	Object.keys(defaults).forEach(function(f){
 		me[f] = options[f] || defaults[f];
 	});
 	if(!me.baseUrl) {
 		throw new Error("baseUrl should be set");
 	}
-	me.acceptUrls = me.acceptUrls.map(function(p){
-		if(p.indexOf('/') === 0) {
-			return urllib.resolve(me.baseUrl, p);
-		} else {
-			return p;
-		}
+	//rewrite base url
+	parts = urllib.parse(me.baseUrl);
+	me.baseUrl = parts.protocol + '//' + parts.hostname;
+	//rewrite pathname
+	pathname = function(x){
+		var parts = urllib.parse(x);
+		return parts.pathname;
+	};
+	me.startUrl = me.baseUrl + pathname(me.startUrl);
+	me.acceptUrls = me.acceptUrls.map(pathname).map(function(p){
+		return me.baseUrl + p;
 	});
-	me.excludeUrls = me.excludeUrls.map(function(p){
-		if(p.indexOf('/') === 0) {
-			return urllib.resolve(me.baseUrl, p);
-		} else {
-			return p;
-		}
+	me.excludeUrls = me.excludeUrls.map(pathname).map(function(p){
+		return me.baseUrl + p;
 	});
-	if(me.startUrl.indexOf('/') === 0) {
-		me.startUrl = urllib.resolve(me.baseUrl, me.startUrl);
-	}
 };
 
 Spider.prototype.start = function(url){
@@ -60,12 +62,13 @@ Spider.prototype.start = function(url){
 	url = url || me.startUrl;
 	if(!url || me.queue) { return; }
 	queue = async.queue(function(url, cb){
-		me.get(url, function(){
-			me._visited.push(url);
+		me.get(url, function(e){
+			e || (me._pool[url] = 1);
 			setImmediate(cb);
 		});
 	}, me.limit);
 	queue.push(url);
+	this._pool[url] = 0;
 	queue.drain = function(){
 		console.log("ok, all task was completed".green);
 		me.destroy();
@@ -75,7 +78,6 @@ Spider.prototype.start = function(url){
 
 Spider.prototype.get = function(url, callback){
 	var me = this, req, type, opt;
-	if(me._visited.indexOf(url) > -1) { return callback(); }
 	console.log('retrive link: ' + url);
 	//detect mimetype, if it is binary, set response.encoding
 	type = mimetype.lookup(url);
@@ -86,19 +88,26 @@ Spider.prototype.get = function(url, callback){
 	}
 	request(opt || url, function(e, resp, body){
 		var ctype;
+		//when error, get the url again
 		if(e) {
 			console.error('error on: %s, %s'.red, url, e.message);
-			me.save(url, 'text/plain', null);
-			return callback(null);
+			if(e.message.indexOf('socket hang up') > -1) {
+				me.queue.push(url);
+			}
+			return callback(true);
 		}
+		//ignore none 200 response
+		if(resp.statusCode !== 200) { return callback() }
+		//get content-type, default to binary
 		ctype = resp.headers['content-type'];
 		if(!ctype) {
 			ctype = mimetype.lookup(url) || mimetype.lookup('.exe');
 		}
+		//parse css, html, get more links
 		if(ctype.indexOf("text/css") === 0) {
 			me.parseCss(url, body);
 		} else if(ctype.indexOf("text/html") === 0) {
-			me.parseHtml(url, body);
+			body = me.parseHtml(url, body);
 		}
 		me.save(url, ctype, body);
 		return callback();
@@ -106,13 +115,13 @@ Spider.prototype.get = function(url, callback){
 };
 
 Spider.prototype.parseCss = function(url, body){
-	var re = /@import\s+([\w\d\-_$]+\.css);?/gi, result, i, len, links = [], tmp;
+	var re = /@import\s+([\w\d\-_$]+\.css);?/gi, result, i, len, links = [], parts;
 	//read @import
 	result = body.match(re);
 	if(result) {
 		for(i=0,len=result.length;i<len;i++) {
-			tmp = re.exec(result[i]);
-			tmp && links.push(urllib.resolve(url, tmp[1]));
+			parts = re.exec(result[i]);
+			parts && links.push(urllib.resolve(url, parts[1]));
 		}
 	}
 	//read url(xx.png)
@@ -120,30 +129,41 @@ Spider.prototype.parseCss = function(url, body){
 	result = body.match(re);
 	if(result) {
 		for(i=0,len=result.length;i<len;i++) {
-			tmp = re.exec(result[i]);
-			tmp && links.push(urllib.resolve(url, tmp[1]));
+			parts = re.exec(result[i]);
+			//TODO: replace absolute path ?
+			parts && links.push(urllib.resolve(url, parts[1]));
 		}
 	}
 	links.length && this.mergeLinks(links);
 };
 
 Spider.prototype.parseHtml = function(url, body) {
-	var me = this, $;
+	var me = this, $, dirty = false;
 	$ = cheerio.load(body);
 	
 	me.mergeLinks($('a[href],link').map(function(i, el){
-		var x = $(el).attr('href');
+		var $el = $(el), x = $el.attr('href'), nx;
 		if(x) {
 			if(!jsHref.test(x)) {
-				return urllib.resolve(url, x);
+				if(absUrlRe.test(x)) {
+					$el.attr('href', x.replace(me.baseUrl, ''));
+					dirty = true;
+				} else {
+					//relative path to absolute path
+					x = urllib.resolve(url, x);
+				}
 			}
 		}
-		return url;
+		return x || url;
 	}));
 	me.mergeLinks($('img, script[src]').map(function(i, el){
-		var x = $(el).attr('src');
-		if(x) {
-			return urllib.resolve(url, x);
+		var $el = $(el), x = $el.attr('src');
+		if(absUrlRe.test(x)) {
+			$el.attr('src', x.replace(me.baseUrl, ''));
+			dirty = true;
+		} else {
+			//relative path to absolute path
+			x = urllib.resolve(url, x);
 		}
 		return url;
 	}));
@@ -152,6 +172,12 @@ Spider.prototype.parseHtml = function(url, body) {
 		var text = $(el).text();
 		text && me.parseCss(url, text);
 	});
+
+	if(dirty) {
+		return $.html();
+	} else {
+		return body;
+	}
 };
 
 Spider.prototype.save = function(url){
@@ -167,28 +193,22 @@ Spider.prototype.save = function(url){
 };
 
 Spider.prototype.mergeLinks = function(links){
-	var me = this, pool = {}, url, i, len, parts;
+	var me = this, pool = this._pool, q = me.queue, url, i, len, parts;
+	if(!links.length) { return }
 	for(i=0,len=links.length;i<len;i++) {
 		url = links[i];
+		parts = urllib.parse(url);
+		//ignore urls with hash
+		if(parts.hash) { continue; }
+		//check exists
 		if(url in pool) {
 			continue;
 		}
-		parts = urllib.parse(url);
-		if(parts.hash) { continue; }
 		if(me.accept(url)) {
-			pool[url] = '';
+			pool[url] = 0;
+			q.push(url);
 		}
 	}
-	for(i=0,len=me._visited;i<len;i++) {
-		url = me._visited[i];
-		if(url in pool) {
-			delete pool[url];
-		}
-	}
-
-	Object.keys(pool).forEach(function(url){
-		me.queue.push(url);
-	});
 };
 
 Spider.prototype.accept = function(url){
@@ -225,19 +245,10 @@ Spider.prototype.initDB = function(){
 				createTable();
 			} else {
 				console.log('[ok] table `docs` exists!');
-				db.all('select url from docs', function(e, rows){
-					var tmp;
-					if(rows && rows.length) {
-						rows = rows.map(function(o){ return urllib.resolve(me.baseUrl, o.url); });
-						tmp = me._visited;
-						me._visited = rows;
-						tmp.length && me._visited.push.apply(me._visited, tmp);
-					}
-					console.log("load urls from db over, total visited:", me._visited.length);
-				});
 			}
 		}
 	});
+	//make sqlite3 write faster
 	db.run('PRAGMA synchronous=OFF');
 	me.db = db;
 };

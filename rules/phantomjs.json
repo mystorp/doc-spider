@@ -1,0 +1,8 @@
+{
+	"name": "phantomjs_docs",
+	"baseUrl": "http://phantomjs.org",
+	"acceptUrls": [],
+	"excludeUrls": [],
+	"startUrl": "/",
+	"limit": 15
+}
