@@ -165,7 +165,7 @@ Spider.prototype.parseHtml = function(url, body) {
 			//relative path to absolute path
 			x = urllib.resolve(url, x);
 		}
-		return url;
+		return x || url;
 	}));
 	
 	$('style').each(function(i, el){
