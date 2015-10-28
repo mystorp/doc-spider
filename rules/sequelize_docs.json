@@ -1,0 +1,7 @@
+{
+	"name": "sequelize_docs",
+	"baseUrl": "http://docs.sequelizejs.com",
+	"acceptUrls": ["http://docs.sequelizejs.com/en/latest/"],
+	"startUrl": "http://docs.sequelizejs.com/en/latest/docs/models-usage/",
+	"limit": 15
+}

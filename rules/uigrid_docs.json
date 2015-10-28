@@ -1,0 +1,21 @@
+{
+	"name": "uigrid_docs",
+	"baseUrl": "http://ui-grid.info/",
+	"acceptUrls": [],
+	"excludeUrls": [],
+	"extraLinks": [
+		"http://ui-grid.info/docs/js/google-code-prettify.js",
+		"http://ui-grid.info/docs/js/marked.js",
+		"http://ui-grid.info/docs/grunt-scripts/csv.js",
+		"http://ui-grid.info/docs/grunt-scripts/pdfmake.js",
+		"http://ui-grid.info/docs/grunt-scripts/vfs_fonts.js",
+		"http://ui-grid.info/docs/grunt-scripts/prettify.js",
+		"http://ui-grid.info/docs/grunt-scripts/marked.js",
+		"http://ui-grid.info/docs/js/angular-bootstrap.js",
+		"http://ui-grid.info/docs/js/angular-bootstrap-prettify.js",
+		"http://ui-grid.info/docs/js/docs-setup.js",
+		"http://ui-grid.info/docs/js/docs.js",
+		"http://ui-grid.info/release/ui-grid.js"],
+	"startUrl": "/",
+	"limit": 15
+}
