@@ -68,7 +68,13 @@ Spider.prototype.start = function(url){
 		});
 	}, me.limit);
 	queue.push(url);
-	this._pool[url] = 0;
+	me._pool[url] = 0;
+	//如果某些资源是使用 JS 动态加载的，找到这些资源放在
+	// extraLinks 里面
+	me.extraLinks && me.extraLinks.forEach(function(url){
+		queue.push(url);
+		me._pool[url] = 0;
+	});
 	queue.drain = function(){
 		console.log("ok, all task was completed".green);
 		me.destroy();
