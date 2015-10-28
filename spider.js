@@ -9,7 +9,8 @@ var mimetype = require('mimetype'),
 	colors,
 	jsHref = /^\s*javascript:/i,
 	textTypeRe = /^text/i,
-	absUrlRe = /^\s*https?:\/\//i;
+	absUrlRe = /^\s*https?:\/\//i,
+	fere = /\.(?:css|js|woff2|jpg|jpeg|gif|png)$/i;
 
 colors = require('colors');
 
@@ -44,6 +45,7 @@ Spider.prototype.mergeOptions = function(options) {
 	//rewrite base url
 	parts = urllib.parse(me.baseUrl);
 	me.baseUrl = parts.protocol + '//' + parts.hostname;
+	me.domain = parts.hostname;
 	//rewrite pathname
 	pathname = function(x){
 		var parts = urllib.parse(x);
@@ -72,10 +74,12 @@ Spider.prototype.start = function(url){
 	me._pool[url] = 0;
 	//如果某些资源是使用 JS 动态加载的，找到这些资源放在
 	// extraLinks 里面
-	me.extraLinks.length && me.extraLinks.forEach(function(url){
-		queue.push(url);
-		me._pool[url] = 0;
-	});
+	if(me.extraLinks.length) {
+		me.extraLinks.forEach(function(url){
+			queue.push(url);
+			me._pool[url] = 0;
+		});
+	}
 	queue.drain = function(){
 		console.log("ok, all task was completed".green);
 		me.destroy();
@@ -85,6 +89,10 @@ Spider.prototype.start = function(url){
 
 Spider.prototype.get = function(url, callback){
 	var me = this, req, type, opt;
+	//如果是做了标记的跨域链接，处理一下
+	if(url.charAt(0) === 'x') {
+		url = url.substring(1);
+	}
 	//detect mimetype, if it is binary, set response.encoding
 	type = mimetype.lookup(url);
 	if(type) {
@@ -121,6 +129,7 @@ Spider.prototype.get = function(url, callback){
 	});
 };
 
+//TODO:处理这种情况：如果CSS文件中引用的图片，字体等文件为绝对链接
 Spider.prototype.parseCss = function(url, body){
 	var re = /@import\s+([\w\d\-_$]+\.css);?/gi, result, i, len, links = [], parts;
 	//read @import
@@ -145,34 +154,44 @@ Spider.prototype.parseCss = function(url, body){
 };
 
 Spider.prototype.parseHtml = function(url, body) {
-	var me = this, $, dirty = false;
+	var me = this, $, dirty = false, protocol, props;
 	$ = cheerio.load(body);
-	
-	me.mergeLinks($('a[href],link').map(function(i, el){
-		var $el = $(el), x = $el.attr('href'), nx;
-		if(x) {
-			if(!jsHref.test(x)) {
-				if(absUrlRe.test(x)) {
-					$el.attr('href', x.replace(me.baseUrl, ''));
-					dirty = true;
-				} else {
-					//relative path to absolute path
-					x = urllib.resolve(url, x);
-				}
-			}
+	//处理类似这种 "//cdn.taobao.com/xx.js"，自动补全协议
+	protocol = url.substring(0, url.indexOf(':') + 1);
+	//不同的 tag 对应的链接属性
+	props = {a: 'href', link: 'href', img: 'src', script: 'src'};
+	//获取所有链接并解析
+	me.mergeLinks($('a,link,img,script').map(function(i, el){
+		var $el = $(el), key = props[el.tagName], x = $el.attr(key), xs;
+		//对于锚链接、空图片和脚本段，它们没有链接，忽略掉
+		if(!x) { return url; }
+		//忽略 <a href="javascript:xyz"></a>
+		if(jsHref.test(x)) { return url; }
+		//替换为当前协议
+		if(x.indexOf('//') === 0) {
+			x = protocol + x;
 		}
-		return x || url;
-	}));
-	me.mergeLinks($('img, script[src]').map(function(i, el){
-		var $el = $(el), x = $el.attr('src');
 		if(absUrlRe.test(x)) {
-			$el.attr('src', x.replace(me.baseUrl, ''));
-			dirty = true;
+			xs = urllib.parse(x);
+			//如果是同域下的资源，强制修改为相对链接
+			if(xs.hostname === me.domain) {
+				$el.attr(key, xs.path);//此处不用 pathname 是为了保留可能的参数，下同
+				dirty = true;
+			} else if(fere.test(xs.pathname)) {
+				//对于跨域的资源，如：CSS，JS，图片，字体，修改为相对于当前域的路径
+				//保存的时候自动存储为当前域路径
+				$el.attr(key, xs.path);
+				//此资源为跨域资源，告诉 #accept 这个资源需要抓取
+				x = 'x' + x;
+				dirty = true;
+			} else {
+				//忽略跨域链接
+			}
 		} else {
-			//relative path to absolute path
+			//相对链接转换为绝对链接
 			x = urllib.resolve(url, x);
 		}
-		return x || url;
+		return x;
 	}));
 	
 	$('style').each(function(i, el){
@@ -221,7 +240,14 @@ Spider.prototype.mergeLinks = function(links){
 Spider.prototype.accept = function(url){
 	var urls = this.excludeUrls, i, len, x;
 	if(typeof url !== "string") { return false; }
-	if(url.indexOf(this.baseUrl) !== 0) { return false; }
+	//如果不是当前域下的资源，必须
+	if(url.indexOf(this.baseUrl) !== 0) {
+		if(url.charAt(0) === 'x') {
+			return true;
+		} else {
+			return false;
+		}
+	}
 	for(i=0,len=urls.length;i<len;i++) {
 		if(url.indexOf(urls[i]) === 0) {
 			return false;

@@ -1,0 +1,8 @@
+{
+	"name": "casperjs_docs",
+	"baseUrl": "http://docs.casperjs.org",
+	"acceptUrls": ["/en/latest/"],
+	"excludeUrls": [],
+	"startUrl": "http://docs.casperjs.org/en/latest/",
+	"limit": 15
+}

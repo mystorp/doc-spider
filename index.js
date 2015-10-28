@@ -17,7 +17,6 @@ function initServer() {
 	var httpServer = http.createServer(function(req, resp){
 		var url = urllib.parse(req.url).pathname;
 		db.get('select * from docs where url=?', url, function(e, o){
-			var file;
 			if(e) {
 				resp.setHeader('content-type', 'text/html');
 				return resp.end('<p style="color: red">' + e.message + '</p>');
@@ -26,15 +25,9 @@ function initServer() {
 				resp.setHeader('content-type', o.type);
 				resp.end(o.content);
 			} else {
-				file = __dirname + url;
-				if(url.indexOf('/static') === 0 && fs.existsSync(file)) {
-					resp.setHeader('content-type', mimetype.lookup(file));
-					fs.createReadStream(file).pipe(resp);
-				} else {
-					resp.setHeader('content-type', 'text/html');
-					resp.statusCode = 404;
-					resp.end('Not Found');
-				}
+				resp.setHeader('content-type', 'text/html');
+				resp.statusCode = 404;
+				resp.end('Not Found');
 			}
 		});
 	});
