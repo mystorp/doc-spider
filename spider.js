@@ -32,7 +32,8 @@ Spider.prototype.mergeOptions = function(options) {
 		acceptUrls: [],
 		excludeUrls: [],
 		startUrl: '',
-		baseUrl: ''
+		baseUrl: '',
+		extraLinks: []
 	}, parts, pathname;
 	Object.keys(defaults).forEach(function(f){
 		me[f] = options[f] || defaults[f];
@@ -71,7 +72,7 @@ Spider.prototype.start = function(url){
 	me._pool[url] = 0;
 	//如果某些资源是使用 JS 动态加载的，找到这些资源放在
 	// extraLinks 里面
-	me.extraLinks && me.extraLinks.forEach(function(url){
+	me.extraLinks.length && me.extraLinks.forEach(function(url){
 		queue.push(url);
 		me._pool[url] = 0;
 	});
