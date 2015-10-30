@@ -19,11 +19,10 @@ function initDatabases() {
 		throw new Error('no database was found!');
 	}
 	files.forEach(function(f){
-		var name = f.substring(0, f.length - 3),
-			fpath = path.resolve(__dirname, f);
-		params.names.push(name);
+		var name = f.substring(0, f.length - 3);
 		console.log('find db:', f);
-		docs[name] = new sqlite3.Database(fpath);
+		params.names.push(name);
+		docs[name] = true;
 	});
 	params.names = params.names.join(',');
 	cache = fs.readFileSync(path.join(__dirname, 'default.html'), {encoding: 'utf-8'});
@@ -36,9 +35,13 @@ function initDatabases() {
 function initServer() {
 	var httpServer = http.createServer(function(req, resp){
 		var parts = urllib.parse(req.url, true),
-			cookies = cookie.parse(req.headers.cookie),
+			cookies = cookie.parse(req.headers.cookie || ''),
 			dbname = (parts.query ? parts.query.db : null) || cookies.db,
 			db = dbname ? docs[dbname] : null;
+
+		if(db === true) {
+			db = docs[dbname] = new sqlite3.Database(path.join(__dirname, dbname + '.db'));
+		}
 		resp.setHeader('content-type', 'text/html');
 
 		if(db) {

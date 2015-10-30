@@ -9,15 +9,13 @@
 <script type="text/javascript">
 	var docmaps = {
 		casperjs_docs: '/en/latest/',
-		openstack_docs: '/',
-		phantomjs_docs: '/',
 		sequelize_docs: '/en/latest/',
 		weixin_docs: '/wiki/home/index.html'
 	};
 	function initDocList() {
 		var available_docs = "{names}".split(','), html;
 		html = available_docs.map(function(name){
-			return '<li><a href="' + docmaps[name] + '?db=' + name + '">' + name + '</a></li>';
+			return '<li><a href="' + (docmaps[name] || '/') + '?db=' + name + '">' + name.replace(/_/g, ' ') + '</a></li>';
 		}).join('');
 		document.querySelector('#docs').innerHTML = html;
 	}
