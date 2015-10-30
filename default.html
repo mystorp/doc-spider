@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>选择文档</title>
+</head>
+<body>
+<ul id="docs"></ul>
+<script type="text/javascript">
+	var docmaps = {
+		casperjs_docs: '/en/latest/',
+		openstack_docs: '/',
+		phantomjs_docs: '/',
+		sequelize_docs: '/en/latest/',
+		weixin_docs: '/wiki/home/index.html'
+	};
+	function initDocList() {
+		var available_docs = "{names}".split(','), html;
+		html = available_docs.map(function(name){
+			return '<li><a href="' + docmaps[name] + '?db=' + name + '">' + name + '</a></li>';
+		}).join('');
+		document.querySelector('#docs').innerHTML = html;
+	}
+	onload = initDocList;
+</script>
+</body>
+</html>

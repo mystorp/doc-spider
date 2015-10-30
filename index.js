@@ -2,37 +2,69 @@ var fs = require('fs'),
 	http = require('http'),
 	path = require('path'),
 	urllib = require('url'),
+	cookie = require('cookie'),
 	sqlite3 = require('sqlite3'),
 	mimetype = require('mimetype'),
-	dbfile = path.resolve(__dirname, process.argv[2]), db;
+	docs = {};
 
-if(!fs.existsSync(dbfile)) {
-	console.log('Database do not exists!');
-	process.exit();
+function initDatabases() {
+	var files = fs.readdirSync(__dirname),
+		dbre = /\.db$/i,
+		params = {names: []},
+		cache;
+	files = files.filter(function(f){
+		return dbre.test(f);
+	});
+	if(!files.length) {
+		throw new Error('no database was found!');
+	}
+	files.forEach(function(f){
+		var name = f.substring(0, f.length - 3),
+			fpath = path.resolve(__dirname, f);
+		params.names.push(name);
+		console.log('find db:', f);
+		docs[name] = new sqlite3.Database(fpath);
+	});
+	params.names = params.names.join(',');
+	cache = fs.readFileSync(path.join(__dirname, 'default.html'), {encoding: 'utf-8'});
+	cache = cache.replace(/\{(.*?)\}/g, function(_, key){
+		return params[key];
+	});
+	docs.defaultPage = cache;
 }
-
-db = new sqlite3.Database(dbfile);
 
 function initServer() {
 	var httpServer = http.createServer(function(req, resp){
-		var url = urllib.parse(req.url).pathname;
-		db.get('select * from docs where url=?', url, function(e, o){
-			if(e) {
-				resp.setHeader('content-type', 'text/html');
-				return resp.end('<p style="color: red">' + e.message + '</p>');
-			}
-			if(o) {
-				resp.setHeader('content-type', o.type);
-				resp.end(o.content);
-			} else {
-				resp.setHeader('content-type', 'text/html');
-				resp.statusCode = 404;
-				resp.end('Not Found');
-			}
-		});
+		var parts = urllib.parse(req.url, true),
+			cookies = cookie.parse(req.headers.cookie),
+			dbname = (parts.query ? parts.query.db : null) || cookies.db,
+			db = dbname ? docs[dbname] : null;
+		resp.setHeader('content-type', 'text/html');
+
+		if(db) {
+			db.get('select * from docs where url=?', parts.pathname, function(e, o){
+				if(e) {
+					return resp.end('<p style="color: red">' + e.message + '</p>');
+				}
+				if(o) {
+					if(o.type.indexOf('text/html') === 0) {
+						resp.setHeader('Set-Cookie', cookie.serialize('db', dbname, {domain: parts.host, path: '/'}))
+					}
+					resp.setHeader('content-type', o.type);
+					resp.end(o.content);
+				} else {
+					resp.statusCode = 404;
+					resp.end('Not Found');
+				}
+			});
+		} else {
+			resp.end(docs.defaultPage);
+		}
 	});
 	httpServer.listen(3000, '0.0.0.0');
 	console.log('server started !');
+	console.log('visit http://127.0.0.1:3000 browse documentations');
 }
 
+initDatabases();
 initServer();
