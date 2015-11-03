@@ -14,6 +14,8 @@ var mimetype = require('mimetype'),
 
 colors = require('colors');
 
+request = request.defaults({followRedirect: false});
+
 function Spider(options) {
 	if(!(this instanceof Spider)) {
 		throw new Error('Class can\'t be function call');
