@@ -194,7 +194,7 @@ Spider.prototype.parseHtml = function(url, body) {
 			x = urllib.resolve(url, x);
 		}
 		return x;
-	}));
+	}).get());
 	
 	$('style').each(function(i, el){
 		var text = $(el).text();
@@ -262,7 +262,8 @@ Spider.prototype.accept = function(url){
 			return true;
 		}
 	}
-	return false;
+	//如果不在可接受列表，也不在接受列表，默认接受
+	return true;
 };
 
 Spider.prototype.initDB = function(){
