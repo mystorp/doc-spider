@@ -2,7 +2,7 @@
 	"name": "chrome_extension_docs",
 	"baseUrl": "https://developer.chrome.com",
 	"acceptUrls": ["/extensions", "/apps"],
-	"excludeUrls": [],
+	"excludeUrls": ["/native-client", "/webstore", "/devtools"],
 	"startUrl": "/apps/api_index",
 	"limit": 15
 }
