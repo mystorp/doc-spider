@@ -33,10 +33,19 @@ function initDatabases() {
 }
 
 function initServer() {
+	var preferDB = process.argv[2];
+	if(preferDB) {
+		if(/\.db$/i.test(preferDB)) {
+			preferDB = preferDB.substring(0, preferDB.length - 3);
+		}
+		if(preferDB in docs) {
+			console.log('set prefered database to:', preferDB);
+		}
+	}
 	var httpServer = http.createServer(function(req, resp){
 		var parts = urllib.parse(req.url, true),
 			cookies = cookie.parse(req.headers.cookie || ''),
-			dbname = (parts.query ? parts.query.db : null) || cookies.db,
+			dbname = (parts.query ? parts.query.db : null) || cookies.db || preferDB,
 			db = dbname ? docs[dbname] : null;
 
 		if(db === true) {

@@ -1,0 +1,9 @@
+
+{
+	"name": "xlsxwriter_docs",
+	"baseUrl": "http://xlsxwriter.readthedocs.org/",
+	"acceptUrls": [],
+	"excludeUrls": [],
+	"startUrl": "http://xlsxwriter.readthedocs.org/",
+	"limit": 15
+}

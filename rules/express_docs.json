@@ -1,0 +1,8 @@
+{
+	"name": "express_docs",
+	"baseUrl": "http://www.expressjs.com.cn/",
+	"acceptUrls": [],
+	"excludeUrls": [],
+	"startUrl": "/",
+	"limit": 15
+}
